@@ -31,22 +31,25 @@ def Predict(regression):
         while len(songUris) < 11:
             track = spot.current_user_saved_tracks(1, random.randint(0, 1268))
             song = track['items'][0]['track']
+            
+            # Don't want duplicate songs in this playlist
+            if (song["uri"] not in songUris):
+                trackAnalysis = spot.audio_features(song["uri"])[0]
+                name = song["name"]
+                print(name)
+                duration = song["duration_ms"]
+                popularity = song["popularity"]
+                key = trackAnalysis["key"]
+                energy = trackAnalysis["energy"]
+                instrumentalness = trackAnalysis["instrumentalness"]
+                loudness = trackAnalysis["loudness"]
+                tempo = trackAnalysis["tempo"]
 
-            trackAnalysis = spot.audio_features(song["uri"])[0]
-            name = song["name"]
-            print(name)
-            duration = song["duration_ms"]
-            popularity = song["popularity"]
-            key = trackAnalysis["key"]
-            energy = trackAnalysis["energy"]
-            instrumentalness = trackAnalysis["instrumentalness"]
-            loudness = trackAnalysis["loudness"]
-            tempo = trackAnalysis["tempo"]
-
-            prediction = regression.predict([[duration, popularity, key, energy, instrumentalness, loudness, tempo]])
-            if (float(prediction[0]) > 0.60):
-                print(name + " Prediction: " + str(prediction))
-                songUris.append(song["uri"])
+                prediction = regression.predict([[duration, popularity, key, energy, instrumentalness, loudness, tempo]])
+                # Checking for prediction confidence. > 60% and we'll add it to the playlist 
+                if (float(prediction[0]) > 0.60):
+                    print(name + " Prediction: " + str(prediction))
+                    songUris.append(song["uri"])
         spot.user_playlist_add_tracks(private.spotifyUserId, playlist["id"], songUris)
 
 def scatterPlot(dataFrame):
@@ -72,11 +75,13 @@ def ScrapeSongs():
         spot = spotipy.Spotify(auth=token)
         
         songUris = []
-        for i in range(0, 5):
-            results = spot.current_user_saved_tracks(10, random.randint(0, 1268))
+        # We're grabbing 100 songs total, in batches of 5
+        for i in range(0, 20):
+            results = spot.current_user_saved_tracks(5, random.randint(0, 1268)) # 1268 is the total amount of songs I have, need to find a way to get this number dynamically
 
             for item in results['items']:
-                songUris.append(item['track']['uri'])
+                if (item["track"]["uri"] not in songUris):
+                    songUris.append(item['track']['uri'])
         print(len(songUris))
 
         tracks = spot.tracks(songUris)['tracks']
