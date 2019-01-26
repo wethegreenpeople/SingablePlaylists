@@ -8,3 +8,17 @@ xxx,0
 migraine,1
 these days,1
 results: 62.5%
+---
+https://open.spotify.com/playlist/5nFDazdz06JF5ud6UKB2ce (Adding lyric simplicity score)
+Juke Jam,0
+Stan,0
+Cigarette  Daydreams,1
+Mocking Bird,1
+One minute,0
+GHOST!,0
+The Watcher,0
+Who knew,1
+Call out my name,1
+When Im gone,1
+Pillow Talking,0
+Results: 45%

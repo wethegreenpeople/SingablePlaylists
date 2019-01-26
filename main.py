@@ -8,13 +8,16 @@ import spotipy.util as util
 import random
 import csv
 import private
+import lyricsgenius
+import textstat
 
 def Train():
-    columnNames = ['Name', 'Duration', 'Popularity', 'Key', 'Time Sig', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'Singable']
+    columnNames = ['Name', 'Duration', 'Popularity', 'Key', 'Time Sig', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'LyricSimplicity', 'Singable']
     songs = pd.read_csv(r"Resources\TrainingData.csv")
     trainingDataframe = DataFrame(songs, columns=columnNames)
+    #scatterPlot(trainingDataframe)
 
-    X = trainingDataframe[['Duration', 'Popularity', 'Key', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo' ]]
+    X = trainingDataframe[['Duration', 'Popularity', 'Key', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'LyricSimplicity']]
     Y = trainingDataframe['Singable']
 
     regression = linear_model.LinearRegression()
@@ -36,7 +39,9 @@ def Predict(regression):
             if (song["uri"] not in songUris):
                 trackAnalysis = spot.audio_features(song["uri"])[0]
                 name = song["name"]
+                artist = song["artists"][0]["name"]
                 print(name)
+                simplicity = LyricDifficulty(GetLyrics(name, artist))
                 duration = song["duration_ms"]
                 popularity = song["popularity"]
                 key = trackAnalysis["key"]
@@ -45,7 +50,7 @@ def Predict(regression):
                 loudness = trackAnalysis["loudness"]
                 tempo = trackAnalysis["tempo"]
 
-                prediction = regression.predict([[duration, popularity, key, energy, instrumentalness, loudness, tempo]])
+                prediction = regression.predict([[duration, popularity, key, energy, instrumentalness, loudness, tempo, simplicity]])
                 # Checking for prediction confidence. > 60% and we'll add it to the playlist 
                 if (float(prediction[0]) > 0.60):
                     print(name + " Prediction: " + str(prediction))
@@ -53,16 +58,9 @@ def Predict(regression):
         spot.user_playlist_add_tracks(private.spotifyUserId, playlist["id"], songUris)
 
 def scatterPlot(dataFrame):
-    plt.scatter(dataFrame['Popularity'], dataFrame['Singable'], color='red')
-    plt.title("Singable Rating VS. Song Popularity", fontsize=14)
-    plt.xlabel("Popularity", fontsize=14)
-    plt.ylabel("Singable")
-    plt.grid(True)
-    plt.show()
-
-    plt.scatter(dataFrame['Energy'], dataFrame['Singable'], color='green')
-    plt.title("Singable Rating VS. Song Energy", fontsize=14)
-    plt.xlabel("Energy", fontsize=14)
+    plt.scatter(dataFrame['Simplicity'], dataFrame['Singable'], color='red')
+    plt.title("Simple VS Singable", fontsize=14)
+    plt.xlabel("Simple", fontsize=14)
     plt.ylabel("Singable")
     plt.grid(True)
     plt.show()
@@ -75,8 +73,8 @@ def ScrapeSongs():
         spot = spotipy.Spotify(auth=token)
         
         songUris = []
-        # We're grabbing 100 songs total, in batches of 5
-        for i in range(0, 20):
+        # We're grabbing 50 songs total, in batches of 5
+        for i in range(0, 10):
             results = spot.current_user_saved_tracks(5, random.randint(0, 1268)) # 1268 is the total amount of songs I have, need to find a way to get this number dynamically
 
             for item in results['items']:
@@ -98,9 +96,24 @@ def ScrapeSongs():
                 trackInfo.append(trackAnalysis[i]["instrumentalness"])
                 trackInfo.append(trackAnalysis[i]["loudness"])
                 trackInfo.append(trackAnalysis[i]["tempo"])
+                trackInfo.append(LyricDifficulty(GetLyrics(tracks[i]["name"], tracks[i]["artists"][0]["name"])))
                 writer = csv.writer(file, delimiter=",")
                 writer.writerow(trackInfo)
 
+def GetLyrics(songName, songArtist):
+    genius = lyricsgenius.Genius(private.geniusAccessToken)
+    song = genius.search_song(songName, songArtist)
+    if (song is not None):
+        return song.lyrics
+    return None
+
+def LyricDifficulty(lyrics):
+    if (lyrics is not None):
+        return textstat.flesch_reading_ease(lyrics)
+    return 0
+
+
 regression = Train()
 Predict(regression)
-
+#ScrapeSongs()
+#print(LyricDifficulty(GetLyrics("Hunter", "Tonedeff")))
