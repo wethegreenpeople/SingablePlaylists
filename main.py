@@ -2,6 +2,12 @@ import pandas as pd
 from pandas import DataFrame
 import matplotlib.pyplot as plt
 from sklearn import linear_model
+from sklearn import tree
+from sklearn import preprocessing
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn import neighbors
+from sklearn import neural_network
+from sklearn.ensemble import RandomForestRegressor
 import statsmodels.api as sm
 import spotipy
 import spotipy.util as util
@@ -10,6 +16,7 @@ import csv
 import private
 import lyricsgenius
 import textstat
+import graphviz
 
 def Train():
     columnNames = ['Name', 'Duration', 'Popularity', 'Key', 'Time Sig', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'LyricSimplicity', 'Singable']
@@ -20,8 +27,9 @@ def Train():
     X = trainingDataframe[['Duration', 'Popularity', 'Key', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'LyricSimplicity']]
     Y = trainingDataframe['Singable']
 
-    regression = linear_model.LinearRegression()
-    return regression.fit(X,Y)
+    regression = RandomForestRegressor(n_estimators=400, max_features=8, max_depth=None, min_samples_split=2)
+    regression = regression.fit(X,Y)
+    return regression
 
 def Predict(regression):
     scope = 'user-library-read playlist-modify-public'
@@ -31,7 +39,7 @@ def Predict(regression):
     if token:
         songUris = []
         playlist = spot.user_playlist_create(private.spotifyUserId, "Singable")
-        while len(songUris) < 11:
+        while len(songUris) < 10:
             track = spot.current_user_saved_tracks(1, random.randint(0, 1268))
             song = track['items'][0]['track']
             
@@ -53,8 +61,8 @@ def Predict(regression):
                 prediction = regression.predict([[duration, popularity, key, energy, instrumentalness, loudness, tempo, simplicity]])
                 # Checking for prediction confidence. > 60% and we'll add it to the playlist 
                 if (float(prediction[0]) > 0.60):
-                    print(name + " Prediction: " + str(prediction))
                     songUris.append(song["uri"])
+                print(name + " Prediction: " + str(prediction))
         spot.user_playlist_add_tracks(private.spotifyUserId, playlist["id"], songUris)
 
 def scatterPlot(dataFrame):
@@ -101,11 +109,14 @@ def ScrapeSongs():
                 writer.writerow(trackInfo)
 
 def GetLyrics(songName, songArtist):
-    genius = lyricsgenius.Genius(private.geniusAccessToken)
-    song = genius.search_song(songName, songArtist)
-    if (song is not None):
-        return song.lyrics
-    return None
+    try:
+        genius = lyricsgenius.Genius(private.geniusAccessToken)
+        song = genius.search_song(songName, songArtist)
+        if (song is not None):
+            return song.lyrics
+        return None
+    except:
+        return None
 
 def LyricDifficulty(lyrics):
     if (lyrics is not None):
