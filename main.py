@@ -19,12 +19,12 @@ import textstat
 import graphviz
 
 def Train():
-    columnNames = ['Name', 'Duration', 'Popularity', 'Key', 'Time Sig', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'LyricSimplicity', 'Singable']
+    columnNames = ['Name', 'Duration', 'Popularity', 'Key', 'Time Sig', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'LyricSimplicity', 'Sections', 'Singable']
     songs = pd.read_csv(r"Resources\TrainingData.csv")
     trainingDataframe = DataFrame(songs, columns=columnNames)
     #scatterPlot(trainingDataframe)
 
-    X = trainingDataframe[['Duration', 'Popularity', 'Key', 'Energy', 'Instrumentalness', 'Loudness', 'Tempo', 'LyricSimplicity']]
+    X = trainingDataframe[['Duration', 'Popularity', 'Key', 'Energy', 'Instrumentalness', 'Tempo', 'LyricSimplicity', 'Sections']]
     Y = trainingDataframe['Singable']
 
     regression = RandomForestRegressor(n_estimators=400, max_features=8, max_depth=None, min_samples_split=2)
@@ -45,20 +45,22 @@ def Predict(regression):
             
             # Don't want duplicate songs in this playlist
             if (song["uri"] not in songUris):
-                trackAnalysis = spot.audio_features(song["uri"])[0]
+                trackFeatures = spot.audio_features(song["uri"])[0]
+                trackAnalysis = spot.audio_analysis(song["uri"])
                 name = song["name"]
                 artist = song["artists"][0]["name"]
                 print(name)
                 simplicity = LyricDifficulty(GetLyrics(name, artist))
                 duration = song["duration_ms"]
                 popularity = song["popularity"]
-                key = trackAnalysis["key"]
-                energy = trackAnalysis["energy"]
-                instrumentalness = trackAnalysis["instrumentalness"]
-                loudness = trackAnalysis["loudness"]
-                tempo = trackAnalysis["tempo"]
+                key = trackFeatures["key"]
+                energy = trackFeatures["energy"]
+                instrumentalness = trackFeatures["instrumentalness"]
+                loudness = trackFeatures["loudness"]
+                tempo = trackFeatures["tempo"]
+                sections = len(trackAnalysis["sections"])
 
-                prediction = regression.predict([[duration, popularity, key, energy, instrumentalness, loudness, tempo, simplicity]])
+                prediction = regression.predict([[duration, popularity, key, energy, instrumentalness, tempo, simplicity, sections]])
                 # Checking for prediction confidence. > 60% and we'll add it to the playlist 
                 if (float(prediction[0]) > 0.60):
                     songUris.append(song["uri"])
@@ -79,34 +81,37 @@ def ScrapeSongs():
 
     if token:
         spot = spotipy.Spotify(auth=token)
-        
-        songUris = []
-        # We're grabbing 50 songs total, in batches of 5
-        for i in range(0, 10):
-            results = spot.current_user_saved_tracks(5, random.randint(0, 1268)) # 1268 is the total amount of songs I have, need to find a way to get this number dynamically
 
-            for item in results['items']:
-                if (item["track"]["uri"] not in songUris):
-                    songUris.append(item['track']['uri'])
-        print(len(songUris))
-
-        tracks = spot.tracks(songUris)['tracks']
-        trackAnalysis = spot.audio_features(songUris)
+        # We're grabbing 200 songs total, in batches of 5
         with open("TrainingData.csv", "w+", newline='') as file:
-            for i in range(0, len(tracks)):
-                trackInfo = []
-                trackInfo.append(tracks[i]["name"])
-                trackInfo.append(tracks[i]["duration_ms"])
-                trackInfo.append(tracks[i]["popularity"])
-                trackInfo.append(trackAnalysis[i]["key"])
-                trackInfo.append(trackAnalysis[i]["time_signature"])
-                trackInfo.append(trackAnalysis[i]["energy"])
-                trackInfo.append(trackAnalysis[i]["instrumentalness"])
-                trackInfo.append(trackAnalysis[i]["loudness"])
-                trackInfo.append(trackAnalysis[i]["tempo"])
-                trackInfo.append(LyricDifficulty(GetLyrics(tracks[i]["name"], tracks[i]["artists"][0]["name"])))
-                writer = csv.writer(file, delimiter=",")
-                writer.writerow(trackInfo)
+            for i in range(0, 40):
+                songUris = []
+                totalSongs = spot.current_user_saved_tracks(1,0)["total"]
+                results = spot.current_user_saved_tracks(5, random.randint(0, totalSongs)) # 1268 is the total amount of songs I have, need to find a way to get this number dynamically
+
+                for item in results['items']:
+                    if (item["track"]["uri"] not in songUris):
+                        songUris.append(item['track']['uri'])
+                tracks = spot.tracks(songUris)['tracks']
+                trackFeatures = spot.audio_features(songUris)
+
+                for i in range(0, len(tracks)):
+                    trackAnalysis = spot.audio_analysis(songUris[i])
+                    trackInfo = []
+                    trackInfo.append(tracks[i]["name"])
+                    trackInfo.append(tracks[i]["duration_ms"])
+                    trackInfo.append(tracks[i]["popularity"])
+                    trackInfo.append(trackFeatures[i]["key"])
+                    trackInfo.append(trackFeatures[i]["time_signature"])
+                    trackInfo.append(trackFeatures[i]["energy"])
+                    trackInfo.append(trackFeatures[i]["instrumentalness"])
+                    trackInfo.append(trackFeatures[i]["loudness"])
+                    trackInfo.append(trackFeatures[i]["tempo"])
+                    trackInfo.append(LyricDifficulty(GetLyrics(tracks[i]["name"], tracks[i]["artists"][0]["name"])))
+                    trackInfo.append(len(trackAnalysis["sections"]))
+                    writer = csv.writer(file, delimiter=",")
+                    writer.writerow(trackInfo)
+            print(len(songUris))
 
 def GetLyrics(songName, songArtist):
     try:
