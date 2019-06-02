@@ -12,9 +12,10 @@ namespace SingableSpotify
 
         }
 
-        public int FleschReadingEase(string text)
+        public double FleschReadingEase(string text)
         {
-            return 0;
+            var calculation = 206.835 - (1.015 * (WordCount(text) / SentenceCount(text))) - (84 * (SyllableCount(text) / WordCount(text)));
+            return calculation;
         }
 
         private int WordCount(string text)
@@ -36,7 +37,7 @@ namespace SingableSpotify
 
             foreach (var word in text.Split(' '))
             {
-                foreach (var character in text)
+                foreach (var character in word)
                 {
                     if (vowels.Contains(character))
                     {
@@ -49,10 +50,10 @@ namespace SingableSpotify
                     }
                 }
 
-                if ((word.EndsWith("e") || (word.EndsWith("es") || word.EndsWith("ed")))
-                      && !word.EndsWith("le"))
-                    syllableCount--;
+                if ((word.EndsWith("e") || word.EndsWith("es") || word.EndsWith("ed")) && !word.EndsWith("le")) { --syllableCount; }
             }
+
+            return syllableCount;
         }
     }
 }
