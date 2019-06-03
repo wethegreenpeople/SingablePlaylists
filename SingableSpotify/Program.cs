@@ -27,7 +27,7 @@ namespace SingableSpotify
             var singableSongs = new List<FullTrack>();
             var rand = new Random();
 
-            ImplicitGrantAuth auth = new ImplicitGrantAuth("6333b8e3c6de47cdadcd860e8d9a881c", "http://localhost:4002", "http://localhost:4002", Scope.UserReadPrivate)
+            ImplicitGrantAuth auth = new ImplicitGrantAuth("6333b8e3c6de47cdadcd860e8d9a881c", "http://localhost:4002", "http://localhost:4002", Scope.UserLibraryRead | Scope.PlaylistModifyPublic)
             {
                 ShowDialog = true,
             };
@@ -39,7 +39,8 @@ namespace SingableSpotify
 
                 while (singableSongs.Count < 10)
                 {
-                    var savedTracks = api.GetSavedTracks(5, rand.Next(0, 1285)).Items;
+                    var totalAvailableSongs = api.GetSavedTracks().Total;
+                    var savedTracks = api.GetSavedTracks(5, rand.Next(0, totalAvailableSongs)).Items;
                     var tracksAudioFeatures = api.GetSeveralAudioFeatures(savedTracks.Select(s => s.Track.Id).ToList()).AudioFeatures;
                     for (int i = 0; i < savedTracks.Count; ++i)
                     {
